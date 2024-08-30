@@ -1,3 +1,9 @@
+import 'package:hive/hive.dart';
+
+part 'data.g.dart';
+
+const String API_KEY = 'AIzaSyAHTfm4WLX5g5cjs6C0_uJFqNecck3NB_8';
+
 const yourLibrary = [
   'Made For You',
   'Recently Played',
@@ -21,6 +27,91 @@ const playlists = [
   'Dank Doggo Tunes',
   'Sleepy Doge',
 ];
+
+class SearchList {
+  final List<SearchItem> searchList = List<SearchItem>.empty();
+  void appendFromJson(Map<String,dynamic> json) {
+    
+  }
+}
+
+class SearchObject {
+  final List<SearchItem>? searchItems;
+  final SearchItem? searchItem;
+  final String? token;
+  final bool success;
+  SearchObject({required this.success, this.searchItems, this.token, this.searchItem});
+
+}
+
+@HiveType(typeId: 1)
+class SearchItem {
+  @HiveField(0)
+  final String imageURL;
+  @HiveField(1)
+  final String views;
+  @HiveField(2)
+  final String title;
+  @HiveField(3)
+  final String artist;
+  @HiveField(4)
+  final String duration;
+  @HiveField(5)
+  final String type;
+  @HiveField(6)
+  final String id;
+  const SearchItem({
+    required this.imageURL,
+    required this.title,
+    required this.artist,
+    required this.duration,
+    required this.views,
+    required this.type,
+    required this.id,
+  });
+
+  SearchItem copyWith({String? imageURL, String? views, String? title, String? artist, String? duration, String? type,
+    String? id}) => SearchItem(
+      artist: artist ?? this.artist,
+      imageURL: imageURL ?? this.imageURL,
+      title: title ?? this.title,
+      duration: duration ?? this.duration,
+      views: views ?? this.views,
+      type: type ?? this.type,
+      id: id ?? this.id,
+    );
+}
+@HiveType(typeId: 2)
+class FavoriteItem {
+  @HiveField(0)
+  final List<SearchItem> favorites;
+
+  const FavoriteItem({
+    required this.favorites
+  });
+}
+@HiveType(typeId: 3)
+class PlaylistItem {
+  @HiveField(0)
+  final List<SearchItem> playlist;
+  @HiveField(1)
+  final String title;
+  @HiveField(2)
+  final String id;
+  @HiveField(3)
+  final String imageURL;
+  const PlaylistItem(this.id, {required this.playlist, required this.title, required this.imageURL});
+
+  PlaylistItem copyWith({String? id, List<SearchItem>? playlist, String? title, String? imageURL}) {
+    return PlaylistItem(id ?? this.id, playlist: playlist ?? this.playlist, title: title ?? this.title, imageURL: imageURL ?? this.imageURL);
+  }
+}
+
+class Playlists {
+  final List<PlaylistItem> playlists;
+
+  const Playlists({required this.playlists});
+}
 
 class Song {
   final String id;

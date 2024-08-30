@@ -3,9 +3,18 @@ import 'dart:io';
 import 'package:desktop_window/desktop_window.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/models/current_track_model.dart';
-import 'package:flutter_application_1/screens/playlist_screens.dart';
+import 'package:flutter_application_1/models/favorites_model.dart';
+import 'package:flutter_application_1/models/playing_model.dart';
+import 'package:flutter_application_1/models/playlists_model.dart';
+import 'package:flutter_application_1/models/search_model.dart';
+import 'package:flutter_application_1/widgets/favorite_page.dart';
+import 'package:flutter_application_1/widgets/playlist_page.dart';
+import 'package:flutter_application_1/widgets/search_page.dart';
 import 'package:flutter_application_1/widgets/sidemenu.dart';
+import 'package:flutter_application_1/repository/base_repository.dart';
+import 'package:flutter_application_1/widgets/youtube_page.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import './widgets/widgets.dart';
 import 'data/data.dart';
@@ -14,148 +23,184 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb && (Platform.isLinux || Platform.isWindows || Platform.isMacOS)) 
     await DesktopWindow.setMinWindowSize(const Size(600,800));
-  
-  runApp(ChangeNotifierProvider(create: (context) => CurrentTrackModel(), child: MyApp()));
+  await Hive.initFlutter();
+  Hive.registerAdapter(SearchItemAdapter());
+  Hive.registerAdapter(PlaylistItemAdapter());
+  await Hive.openBox<SearchItem>('SearchItemBox');
+  await Hive.openBox<PlaylistItem>('PlaylistItemBox');
+  await Hive.openBox<SearchItem>('FavoriteItemBox');
+  runApp(
+    MyApp()
+    );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
+  MyApp({super.key});
+  final GlobalKey<YoutubePageState> _youtubePageKey = GlobalKey<YoutubePageState>();
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Youtube Player',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.black87),
-        useMaterial3: true,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => FavoritesModel()),
+        ChangeNotifierProvider(create: (context) => PlaylistsModel()),
+        ChangeNotifierProvider(create: (context) => SearchModel()),
+        ChangeNotifierProvider(create: (context) => PlayingModel())
+      ],
+      child: MaterialApp(
+        title: 'Flutter Youtube Player',
+        theme: ThemeData(
+          // This is the theme of your application.
+          //
+          // TRY THIS: Try running your application with "flutter run". You'll see
+          // the application has a purple toolbar. Then, without quitting the app,
+          // try changing the seedColor in the colorScheme below to Colors.green
+          // and then invoke "hot reload" (save your changes or press the "hot
+          // reload" button in a Flutter-supported IDE, or press "r" if you used
+          // the command line to start the app).
+          //
+          // Notice that the counter didn't reset back to zero; the application
+          // state is not lost during the reload. To reset the state, use hot
+          // restart instead.
+          //
+          // This works for code too, not just values: Most code changes can be
+          // tested with just a hot reload.
+          primaryColor: Colors.black87,
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.black87),
+          useMaterial3: true,
+        ),
+        home: Screen(youtubePageKey : _youtubePageKey)
       ),
-      home: const PlayerHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
 
-class PlayerHomePage extends StatelessWidget {
-  const PlayerHomePage({super.key, required this.title});
-  final String title;
+class Screen extends StatefulWidget {
+  final GlobalKey<YoutubePageState> youtubePageKey;
+  Screen({required this.youtubePageKey});
+
+  @override
+  State<Screen> createState() => _ScreenState();
+}
+
+class _ScreenState extends State<Screen>{
+  final List<Widget> pages = [FavoritePage(),
+    PlaylistPage(),
+    SearchPage()];
+  late PageController _pageController;
+  int selectedIndex = 0;
+
+  void onNavChange(int i) {
+    setState(() {selectedIndex = i;});
+    _pageController.jumpToPage(i);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    _pageController = PageController(initialPage: 0);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    //final index = context.watch<CurrentTabModel>().selectedIndex;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 600) {
+          return Scaffold(
+            body: Stack(
+              alignment: Alignment.bottomLeft,
+              children: [
+                PageView(
+                controller: _pageController,
+                children: pages,
+                ),
+                YoutubePage(key: widget.youtubePageKey)
+              ]
+            ),
+            bottomNavigationBar: _buildMobileLayout(onNavChange: onNavChange,index:selectedIndex),
+          );
+        } else {
+          
+          return Scaffold(
+            body: Row(
+              children: [
+                _buildDesktopLayout(onNavChange: onNavChange,index:selectedIndex),
+                Expanded(
+                  child: Stack(
+                    alignment: Alignment.bottomLeft,
+                    children: [
+                      PageView(
+                        controller: _pageController,
+                        children: pages,
+                      ),
+                      YoutubePage(key: widget.youtubePageKey)
+                    ]
+                  ),
+                )
+              ],
+            ),
+          );
+        }
+      }
+    );
+  }
+}
+
+class _buildMobileLayout extends StatelessWidget {
+    final void Function(int) onNavChange;
+    final int index;
+
+  const _buildMobileLayout({super.key, required this.onNavChange, required this.index});
+    @override
+    Widget build(BuildContext context) {
+      return NavigationBar(
+          onDestinationSelected: onNavChange,
+          indicatorColor: Colors.amber,
+          selectedIndex: index,
+          destinations: [
+            NavigationDestination(icon: Icon(Icons.favorite), label: 'Favorite'),
+            NavigationDestination(icon: Icon(Icons.playlist_play), label: 'Playlist'),
+            NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
+          ],
+        );
+    }
+  }
+
+  class _buildDesktopLayout extends StatelessWidget{
+    final void Function(int) onNavChange;
+    final int index;
+
+  const _buildDesktopLayout({super.key, required this.onNavChange, required this.index});
 
     @override
     Widget build(BuildContext context) {
-      return Scaffold(
-        body: Column(
-          children: [
-            Expanded(
-              child: 
-                Row(children: [
-                  SideMenu(),
-                  Expanded(child: PlaylistScreens(playlist: lofihiphopPlaylist)),
-                ],)
-            ),
-            CurrentTrack()
-        ],)
-      );
-    }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+    return NavigationRail(
+      onDestinationSelected: onNavChange,
+      indicatorColor: Colors.amber,
+      selectedIndex: index,
+      labelType: NavigationRailLabelType.selected,
+      destinations: [
+        NavigationRailDestination(
+          icon: Icon(Icons.favorite),
+          label: Text('Favorite'),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+        NavigationRailDestination(
+          icon: Icon(Icons.playlist_play),
+          label: Text('Playlist'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.search),
+          label: Text('Search'),
+        ),
+      ],
     );
   }
 }
+

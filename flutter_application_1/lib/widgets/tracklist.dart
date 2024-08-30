@@ -18,6 +18,7 @@ class Tracklist extends StatelessWidget{
         DataColumn(label: Text('ALBUM')),
         DataColumn(label: Icon(Icons.access_time)),
       ],
+
       rows: tracklist.map((e) {
         final selected = context.watch<CurrentTrackModel>().selected?.id == e.id;
         final textStyle = selected ? TextStyle(color: Colors.green,) : null;
