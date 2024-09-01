@@ -32,25 +32,19 @@ class YoutubePageState extends State<YoutubePage>{
     _controller = _playingModel.controller;
     _Youtube = YoutubePlayer(controller: _playingModel.controller, aspectRatio: 16/9, keepAlive: true);
     //_playingModel.addListener(update);
-    //_controller.listen(_playingModel.updateFromListener);
+    _controller.listen(update);
     _pages = [
       MinimizedYoutube(minimize: _playingModel.switchTab, youtube: _Youtube),
       MaximizedYoutube(minimize: _playingModel.switchTab, youtube: _Youtube),
       ];
   }
 
-  void update() {
-    if (_playingModel.song?.type == 'video')  {
-      _controller.loadVideoById(videoId: _playingModel.currentId!);
-      if (init) setState(() {init = false; page = 1;});
-    }
-    else if (_playingModel.song?.type == 'playlist')  {
-      if (_playingModel.playlistChangeFlag) {
-      }
-      else {
-        _controller.loadPlaylist(index: _playingModel.currentIndex!, list: _playingModel.playlist!.map((e) => e.id).toList());
-        if (init) setState(() {init = false; page = 1;});
-      }
+  void update(YoutubePlayerValue value) async {
+    if (_playingModel.song?.type == 'video') return;
+    int index = await _controller.playlistIndex;
+    if (index != _playingModel.currentIndex) {
+      _playingModel.currentIndex = index;
+      _playingModel.currentId = _playingModel.playlist![index].id;
     }
   }
 
