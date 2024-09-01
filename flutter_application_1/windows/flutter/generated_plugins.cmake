@@ -4,7 +4,6 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_window
-  screen_brightness_windows
   url_launcher_windows
 )
 

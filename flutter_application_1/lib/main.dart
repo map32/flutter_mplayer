@@ -10,8 +10,6 @@ import 'package:flutter_application_1/models/search_model.dart';
 import 'package:flutter_application_1/widgets/favorite_page.dart';
 import 'package:flutter_application_1/widgets/playlist_page.dart';
 import 'package:flutter_application_1/widgets/search_page.dart';
-import 'package:flutter_application_1/widgets/sidemenu.dart';
-import 'package:flutter_application_1/repository/base_repository.dart';
 import 'package:flutter_application_1/widgets/youtube_page.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -77,7 +75,7 @@ class MyApp extends StatelessWidget {
 
 class Screen extends StatefulWidget {
   final GlobalKey<YoutubePageState> youtubePageKey;
-  Screen({required this.youtubePageKey});
+  const Screen({required this.youtubePageKey});
 
   @override
   State<Screen> createState() => _ScreenState();
@@ -95,15 +93,21 @@ class _ScreenState extends State<Screen>{
     _pageController.jumpToPage(i);
   }
 
+  void onControllerChange() {
+    setState(() {selectedIndex = _pageController.page!.round();});
+  }
+
   @override
   void initState() {
     super.initState();
 
     _pageController = PageController(initialPage: 0);
+    _pageController.addListener(onControllerChange);
   }
 
   @override
   void dispose() {
+    _pageController.removeListener(onControllerChange);
     _pageController.dispose();
     super.dispose();
   }
@@ -114,12 +118,13 @@ class _ScreenState extends State<Screen>{
       builder: (context, constraints) {
         if (constraints.maxWidth < 600) {
           return Scaffold(
+            resizeToAvoidBottomInset:false,
             body: Stack(
               alignment: Alignment.bottomLeft,
               children: [
-                PageView(
-                controller: _pageController,
-                children: pages,
+                PageView( 
+                  controller: _pageController,
+                  children: pages,
                 ),
                 YoutubePage(key: widget.youtubePageKey)
               ]
@@ -129,6 +134,7 @@ class _ScreenState extends State<Screen>{
         } else {
           
           return Scaffold(
+            resizeToAvoidBottomInset:false,
             body: Row(
               children: [
                 _buildDesktopLayout(onNavChange: onNavChange,index:selectedIndex),
@@ -161,13 +167,15 @@ class _buildMobileLayout extends StatelessWidget {
     @override
     Widget build(BuildContext context) {
       return NavigationBar(
+          height: 60.0,
           onDestinationSelected: onNavChange,
           indicatorColor: Colors.amber,
           selectedIndex: index,
+          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
           destinations: [
-            NavigationDestination(icon: Icon(Icons.favorite), label: 'Favorite'),
-            NavigationDestination(icon: Icon(Icons.playlist_play), label: 'Playlist'),
-            NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
+            const NavigationDestination(icon: const Icon(Icons.favorite), label: 'Favorite'),
+            const NavigationDestination(icon: const Icon(Icons.playlist_play), label: 'Playlist'),
+            const NavigationDestination(icon: const Icon(Icons.search), label: 'Search'),
           ],
         );
     }
@@ -187,16 +195,16 @@ class _buildMobileLayout extends StatelessWidget {
       selectedIndex: index,
       labelType: NavigationRailLabelType.selected,
       destinations: [
-        NavigationRailDestination(
-          icon: Icon(Icons.favorite),
+        const NavigationRailDestination(
+          icon: const Icon(Icons.favorite),
           label: Text('Favorite'),
         ),
-        NavigationRailDestination(
-          icon: Icon(Icons.playlist_play),
+        const NavigationRailDestination(
+          icon: const Icon(Icons.playlist_play),
           label: Text('Playlist'),
         ),
-        NavigationRailDestination(
-          icon: Icon(Icons.search),
+        const NavigationRailDestination(
+          icon: const Icon(Icons.search),
           label: Text('Search'),
         ),
       ],

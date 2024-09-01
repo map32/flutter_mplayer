@@ -114,15 +114,17 @@ class PlayingCard extends StatelessWidget {
         children: [
           Image.network(
             item.imageURL,
-            height: 81.0,
-            width: 144.0,
+            height: 40.5,
+            width: 72.0,
             fit: BoxFit.cover
           ),
-          Column(
-            children: [
-              Text(item.title, overflow: TextOverflow.ellipsis,),
-              Text(item.artist, overflow: TextOverflow.ellipsis,)
-            ],
+          Expanded(
+            child: Column(
+              children: [
+                Text(item.title, overflow: TextOverflow.ellipsis,),
+                Text(item.artist, overflow: TextOverflow.ellipsis,)
+              ],
+            ),
           )
         ],
       ),

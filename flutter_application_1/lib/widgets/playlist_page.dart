@@ -13,14 +13,19 @@ class PlaylistList extends StatefulWidget {
   _PlaylistListState createState() => _PlaylistListState();
 }
 
-class _PlaylistListState extends State<PlaylistList>{
+class _PlaylistListState extends State<PlaylistList> {
   bool _editing = false;
   ScrollController? _scrollController;
-
+  late PlaylistsModel pm;
+  late PlayingModel plm;
+  late PlaylistViewModel pvm;
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    pm = context.read<PlaylistsModel>();
+    plm = context.read<PlayingModel>();
+    pvm = context.read<PlaylistViewModel>();
   }
 
   @override
@@ -29,40 +34,43 @@ class _PlaylistListState extends State<PlaylistList>{
     super.dispose();
   }
 
+  void onEditChange() {setState(() {_editing = !_editing;});}
+
   Widget _Image(PlaylistItem playlist)  {
     if (playlist.imageURL == '')
     {
       if (playlist.playlist.length > 0) {
         return Image.network(playlist.playlist[0].imageURL,
-                    height: 100.0,
-                    width: 160.0,
+                    height: 40.5,
+            width: 72.0,
                     fit: BoxFit.cover,
                   );
-      } else return Container(height: 100.0, width:160.0);
+      } else return Container(height: 40.5,
+            width: 72.0,);
     } else return Image.network(playlist.imageURL,
-                    height: 100.0,
-                    width: 160.0,
+                    height: 40.5,
+            width: 72.0,
                     fit: BoxFit.cover,
                   );
   }
 
   @override
   Widget build(BuildContext context) {
-    var playlists = context.watch<PlaylistsModel>().getAll();
+    List<PlaylistItem> playlists = context.watch<PlaylistsModel>().getAll();
     if (playlists.length == 0) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('No Playlists'),
+          const Text('No Playlists'),
         ],
       );
     }
     return Scaffold(
       appBar:AppBar(
-        title: Text('Playlists'),
+        title: const Text('Playlists'),
         actions: [
-          IconButton(onPressed: () {setState(() {_editing = !_editing;});}, icon: Icon(Icons.edit, color: _editing ? Colors.orange : null)),
+          IconButton(onPressed: onEditChange, icon: Icon(Icons.edit, color: _editing ? Colors.orange : null)),
         ]
       ),
       body: Scrollbar(
@@ -79,13 +87,14 @@ class _PlaylistListState extends State<PlaylistList>{
                     children: [
                       _Image(e),
                       const SizedBox(width: 8.0),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(e.title, overflow: TextOverflow.ellipsis,),
-                        ],
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(e.title, overflow: TextOverflow.ellipsis,),
+                          ],
+                        ),
                       ),
-                      const Spacer(),
                       IconButton(
                           icon: Icon(
                             !_editing ? Icons.arrow_forward_ios : Icons.delete,
@@ -93,17 +102,17 @@ class _PlaylistListState extends State<PlaylistList>{
                         ),
                         onPressed: () {
                           if (_editing) {
-                            context.read<PlaylistsModel>().delete(e.id);
+                            pm.delete(e.id);
                             return;
                           }
-                          context.read<PlaylistViewModel>().updateFromStorage(e); widget.setPlaylist();
+                          pvm.updateFromStorage(e); widget.setPlaylist();
                         },
                         iconSize: 30.0,
                       )
                     ]
                   ),
                   onTap: () {
-                    context.read<PlayingModel>().updatePlaylist(e);
+                    plm.updatePlaylist(e);
                   }
                 )
               ).toList(),
@@ -150,6 +159,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
       create: (context) => PlaylistViewModel(),
       child: PageView(
         controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
         children: [
           PlaylistList(setPlaylist: setPlaylist,),
           IndividualPlaylist(cancelPlaylist: cancelPlaylist)
@@ -160,7 +170,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
 }
 
 class IndividualPlaylist extends StatefulWidget{
-  final Function cancelPlaylist;
+  final void Function() cancelPlaylist;
   final bool isOnline;
 
   const IndividualPlaylist({super.key, required this.cancelPlaylist, this.isOnline = false});
@@ -171,21 +181,22 @@ class IndividualPlaylist extends StatefulWidget{
 class _IndividualPlaylistState extends State<IndividualPlaylist>{
   ScrollController? _scrollController;
   bool _editing = false;
-
+  late PlaylistsModel pm;
+  late PlaylistViewModel pvm;
+  late PlayingModel plm;
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+    pm = context.read<PlaylistsModel>();
+    pvm = context.read<PlaylistViewModel>();
+    plm = context.read<PlayingModel>();
   }
 
   @override
   void dispose() {
     _scrollController?.dispose();
     super.dispose();
-  }
-
-  void update() {
-
   }
 
   @override
@@ -195,13 +206,13 @@ class _IndividualPlaylistState extends State<IndividualPlaylist>{
     if (pl == null) return Container(child: Center(child: Text('Error')),);
     return Scaffold(
       appBar: AppBar(
-        leading: BackButton(onPressed: () {widget.cancelPlaylist();}),
+        leading: BackButton(onPressed: widget.cancelPlaylist),
         title: Text(pl.title, overflow: TextOverflow.ellipsis,),
         actions: [
           !widget.isOnline ? IconButton(onPressed: () {setState(() {_editing = !_editing;});}, icon: Icon(Icons.edit, color: _editing ? Colors.orange : Colors.grey))
             : loaded ? IconButton(onPressed: () async {
               final result = await _showConfirmationDialog(context);
-              if (result!) context.read<PlaylistsModel>().add(pl);
+              if (result!) pm.add(pl);
             },icon: const Icon(Icons.add)) : CircularProgressIndicator()
         ],
       ),
@@ -221,8 +232,8 @@ class _IndividualPlaylistState extends State<IndividualPlaylist>{
                           children: [
                             Image.network(
                               pl.playlist[_].imageURL,
-                              height: 81.0,
-                              width: 144.0,
+                              height: 40.5,
+            width: 72.0,
                               fit: BoxFit.cover,
                             ),
                             const SizedBox(width: 8.0),
@@ -239,9 +250,9 @@ class _IndividualPlaylistState extends State<IndividualPlaylist>{
                             !widget.isOnline ? IconButton(
                               icon: Icon(!_editing ? Icons.arrow_forward_ios : Icons.delete),
                               onPressed: () async {if (_editing) {
-                                context.read<PlaylistsModel>().deleteSong(pl.id, pl.playlist[_]);
-                                PlaylistItem? p = await context.read<PlaylistsModel>().get(pl.id);
-                                context.read<PlaylistViewModel>().updateFromStorage(p!);
+                                pm.deleteSong(pl.id, pl.playlist[_]);
+                                PlaylistItem? p = await pm.get(pl.id);
+                                pvm.updateFromStorage(p!);
                                 //print('hh');
                               }},
                               iconSize: 30.0,
@@ -251,7 +262,7 @@ class _IndividualPlaylistState extends State<IndividualPlaylist>{
                         ),
                         onTap: () {
                           if (_editing) return;
-                          context.read<PlayingModel>().updatePlaylist(pl, index: _);
+                          plm.updatePlaylist(pl, index: _);
                         }
                       ),
                     ),

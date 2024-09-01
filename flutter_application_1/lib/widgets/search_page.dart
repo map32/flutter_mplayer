@@ -18,7 +18,6 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage>{
   late PageController _pageController;
-  PlaylistItem? pl;
   @override
   void initState() {
     super.initState();
@@ -38,13 +37,13 @@ class _SearchPageState extends State<SearchPage>{
     _pageController.animateToPage(0, duration: Duration(milliseconds: 150), curve: Curves.easeIn);
   }
 
-    int index = 0;
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (context) => PlaylistViewModel(),
       child: PageView(
         controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
         children: [
           SearchView(setPlaylist: setPlaylist),
           IndividualPlaylist(cancelPlaylist: cancelPlaylist, isOnline: true)
@@ -65,6 +64,50 @@ class SearchView extends StatelessWidget {
         SearchBox(),
         SearchList(setPlaylist: setPlaylist)
       ],
+    );
+  }
+}
+
+class SearchBox extends StatefulWidget {
+    @override
+    _SearchBoxState createState() {
+      return _SearchBoxState();
+    }
+}
+
+class _SearchBoxState extends State<SearchBox>{
+  TextEditingController? _searchController;
+  late SearchModel sm;
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    sm = context.read<SearchModel>();
+  }
+
+  @override
+  void dispose() {
+    _searchController?.dispose();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      child: TextField(
+        controller: _searchController,
+        onSubmitted: (value) => sm.update(value),
+        decoration: InputDecoration(
+          hintText: 'Search',
+          suffixIcon: IconButton(
+            onPressed: () => _searchController?.clear(),
+            icon: const Icon(Icons.clear_rounded)
+          ),
+          prefixIcon: IconButton(
+            onPressed: () => sm.update(_searchController?.text), //perform search here
+            icon: const Icon(Icons.search)
+          )
+        ),
+      ),
     );
   }
 }
@@ -114,9 +157,12 @@ class SearchListState extends State<SearchList> with AutomaticKeepAliveClientMix
     final searchList = context.watch<SearchModel>().searchList;
     final playing = context.watch<PlayingModel>();
     return Expanded(
-      child: ListView(
+      child: Scrollbar(
         controller: _scrollController,
-        children: [...searchList.map((item) => SearchElement(item: item, setPlaylist: widget.setPlaylist,)), _isLoadingMore ? Center(child: CircularProgressIndicator()) : SizedBox.shrink()],
+        child: ListView(
+          controller: _scrollController,
+          children: [...searchList.map((item) => SearchElement(item: item, setPlaylist: widget.setPlaylist,)), _isLoadingMore ? Center(child: CircularProgressIndicator()) : SizedBox.shrink()],
+        ),
       ),
     );
   }
@@ -134,7 +180,8 @@ class SearchElement extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IntrinsicHeight(
+    return Container(
+      height: 40.5,
       child: Row(
         children: [
           Expanded(
@@ -149,13 +196,13 @@ class SearchElement extends StatelessWidget {
                   Image.network(
                     item.imageURL,
                     fit: BoxFit.cover,
-                    width: 144.0,
-                    height: 81.0,
+                    height: 40.5,
+            width: 72.0,
                   ),
                   const SizedBox(width: 8.0),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Text(item.title, overflow: TextOverflow.ellipsis,),
                         Text('${item.artist} | ${item.views} | ${item.duration}', overflow: TextOverflow.ellipsis,),
@@ -191,48 +238,6 @@ class SearchElement extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class SearchBox extends StatefulWidget {
-    @override
-    _SearchBoxState createState() {
-      return _SearchBoxState();
-    }
-}
-
-class _SearchBoxState extends State<SearchBox>{
-  TextEditingController? _searchController;
-
-  @override
-  void initState() {
-    super.initState();
-    _searchController = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _searchController?.dispose();
-    super.dispose();
-  }
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Search',
-          suffixIcon: IconButton(
-            onPressed: () => _searchController?.clear(),
-            icon: Icon(Icons.clear_rounded)
-          ),
-          prefixIcon: IconButton(
-            onPressed: () => context.read<SearchModel>().update(_searchController?.text), //perform search here
-            icon: Icon(Icons.search)
-          )
-        ),
       ),
     );
   }

@@ -14,15 +14,39 @@ class PlayingModel extends ChangeNotifier{
   int? currentIndex = 0;
   String? currentId;
   bool playlistChangeFlag = false;
+  bool maximized = false;
+  YoutubePlayerController _controller = YoutubePlayerController(
+    params: const YoutubePlayerParams(
+      //showControls: true,
+      mute: false,
+      showFullscreenButton: false,
+      loop: false,
+      enableCaption: false,
+      showVideoAnnotations: false,
+      showControls: true,
+      strictRelatedVideos: true,
+    ),
+  );
+  //YoutubePlayer _Youtube = YoutubePlayer(controller: _controller, aspectRatio: 16/9, keepAlive: true);
   //playlist token
   String? token;
   PlaylistRepository playlistRepository = PlaylistRepository();
-  void updateSong(SearchItem song) {
+
+  YoutubePlayerController get controller => _controller;
+
+  void switchTab() {
+    maximized = !maximized;
+    notifyListeners();
+  }
+
+  void updateSong(SearchItem song) async {
     
     token = null;
     currentIndex = 0;
     currentId = song.id;
     this.song = song;
+    _controller.loadVideoById(videoId: song.id);
+    maximized = true;
     notifyListeners();
   }
   String formatDuration(Duration duration) {
@@ -39,22 +63,7 @@ class PlayingModel extends ChangeNotifier{
   // Return the formatted string in HH:MM:SS format
   return '$formattedHours:$formattedMinutes:$formattedSeconds';
 }
-  void updateFromListener(YoutubePlayerValue value) {
-    //if (value.metaData.videoId == song?.id) return;
-    
-    if (song!.type == 'playlist') {
-      int i = playlist!.indexWhere((item) => item.id == value.metaData.videoId);
-      if (i >= 0 && i != currentIndex) {
-        currentIndex = i;
-        currentId = value.metaData.videoId;
-        playlistChangeFlag = true;
-        
-        notifyListeners();
-      }
-      else return;
-    }
-  }
-  void updatePlaylist(PlaylistItem pl, {int index = 0}) {
+  void updatePlaylist(PlaylistItem pl, {int index = 0}) async {
     assert (pl.playlist.length > 0);
     token = null;
     currentIndex = index;
@@ -62,7 +71,8 @@ class PlayingModel extends ChangeNotifier{
     this.song = SearchItem(imageURL: pl.playlist[0].imageURL, title: pl.title, artist: '', duration: '', views: '', type: 'playlist', id: pl.id);
     playlist = pl.playlist;
     playlistChangeFlag = false;
-    
+    _controller.loadPlaylist(list: playlist!.map((e) => e.id).toList());
+    maximized = true;
     notifyListeners();
   }
   void next() {

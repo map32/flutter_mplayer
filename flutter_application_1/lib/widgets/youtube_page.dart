@@ -28,21 +28,14 @@ class YoutubePageState extends State<YoutubePage>{
   @override
   void initState() {
     super.initState();
-    _controller = YoutubePlayerController(
-      params: const YoutubePlayerParams(
-        showControls: true,
-        mute: false,
-        showFullscreenButton: false,
-        loop: false,
-      ),
-    );
-    _Youtube = YoutubePlayer(controller: _controller, aspectRatio: 16/9, keepAlive: true);
     _playingModel = context.read<PlayingModel>();
-    _playingModel.addListener(update);
+    _controller = _playingModel.controller;
+    _Youtube = YoutubePlayer(controller: _playingModel.controller, aspectRatio: 16/9, keepAlive: true);
+    //_playingModel.addListener(update);
     //_controller.listen(_playingModel.updateFromListener);
     _pages = [
-      MinimizedYoutube(minimize: minimize, youtube: _Youtube),
-      MaximizedYoutube(minimize: minimize, youtube: _Youtube),
+      MinimizedYoutube(minimize: _playingModel.switchTab, youtube: _Youtube),
+      MaximizedYoutube(minimize: _playingModel.switchTab, youtube: _Youtube),
       ];
   }
 
@@ -76,22 +69,23 @@ class YoutubePageState extends State<YoutubePage>{
 
 
   // Helper method to build each child widget with Offstage control
-  Widget _buildChild(Widget child, int index) {
+  Widget _buildChild(Widget child, bool enabled) {
     return Offstage(
-      offstage: page != index, // Hides the widget if it's not the current one
+      offstage: !enabled, // Hides the widget if it's not the current one
       child: child,
     );
   }
   
   @override
   Widget build(BuildContext context) {
-
+    bool maximized = context.watch<PlayingModel>().maximized;
+    print(maximized);
     return YoutubePlayerControllerProvider(
       controller: _controller,
       child: Stack(
         children: [
-          _buildChild(_pages[0], 0),
-          _buildChild(_pages[1], 1)
+          _buildChild(_pages[0], !maximized),
+          _buildChild(_pages[1], maximized)
         ]
       ),
     );
@@ -101,18 +95,21 @@ class YoutubePageState extends State<YoutubePage>{
 
 class MaximizedYoutube extends StatelessWidget{
   final Function minimize;
-  final Widget youtube;
+  final YoutubePlayer youtube;
 
   const MaximizedYoutube({super.key, required this.minimize, required this.youtube});
    @override
   Widget build(BuildContext context) {
     PlayingModel pm = context.watch<PlayingModel>();
+    print(youtube);
     //if (pm.song == null) return const SizedBox.shrink();
     String title = '';
     if (pm.song?.type == 'video')
       title = '${pm.song!.artist} - ${pm.song!.title}';
     else if (pm.song?.type == 'playlist')
       title = '${pm.song?.title} - Now Playing: ${pm.playlist![pm.currentIndex!].artist} - ${pm.playlist![pm.currentIndex!].title}';
+    double videoWidth = min(MediaQuery.sizeOf(context).width, 800.0);
+    double videoHeight = videoWidth * (9/16) + 500;
     return Scaffold(
         appBar: AppBar(
           leading: IconButton(
@@ -136,17 +133,94 @@ class MaximizedYoutube extends StatelessWidget{
             )
           ],
         ),
-        body: Center(
-          child: Container(
-            width: min(MediaQuery.sizeOf(context).width, 800.0),
-            child: 
-              youtube
-          ),
+        body: Column(
+          children: [
+            ClipRect(
+              child: SizedBox(
+                height: videoHeight-500,
+                width: videoWidth,
+                child: OverflowBox(
+                  maxWidth: videoWidth,
+                  maxHeight: videoHeight,
+                  child: Container(
+                    width: videoWidth,
+                    height: videoHeight,
+                  
+                    child: youtube
+                      //youtube
+                  ),
+                ),
+              ),
+            ),
+            //Text('stupid'),
+            YoutubeMenu()
+          ],
         )
       );
   }
 }
 
+class MyCustomClipper extends CustomClipper<Rect> {
+  @override
+  Rect getClip(Size size) {
+    // Define the area to show (only top-left 100x100 area of the widget)
+    return Rect.fromLTWH(0, 0, size.width, size.height);
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Rect> oldClipper) {
+    return false;
+  }
+}
+
+class YoutubeMenu extends StatefulWidget {
+  const YoutubeMenu({super.key});
+  
+  @override
+  _YoutubeMenuState createState() => _YoutubeMenuState();
+}
+
+class _YoutubeMenuState extends State<YoutubeMenu>{
+  bool dragging = false;
+  double val = 0.0;
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        StreamBuilder(
+          stream: context.ytController.videoStateStream,
+          builder: (context, snapshot) {
+            //print(snapshot.connectionState);
+            //print(snapshot.data);
+            double max = context.ytController.metadata.duration.inMilliseconds / 1000;
+            double currentTime = snapshot.hasData ? snapshot.data!.position.inMilliseconds / 1000 : 0.0;
+            //return Text('${currentTime} / ${max}');
+            return Slider(max: max, value: dragging ? val : currentTime, onChanged: (value) {setState(() {val = value;});}, onChangeStart: (value) {setState(() {dragging = true;});} , onChangeEnd: (value) {context.ytController.seekTo(seconds: value, allowSeekAhead: true).then((_){setState((){dragging = false;});});});
+         }
+        ),
+        YoutubeValueBuilder(builder: (context, value) {
+          return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.skip_previous),
+              onPressed: context.ytController.previousVideo,
+            ),
+            IconButton(
+              icon: Icon(value.playerState == PlayerState.playing ? Icons.pause : Icons.play_arrow),
+              iconSize: 36.0,
+              onPressed: value.playerState == PlayerState.playing ? context.ytController.pauseVideo : context.ytController.playVideo,
+            ),
+            IconButton(
+              icon: const Icon(Icons.skip_next),
+              onPressed: context.ytController.nextVideo,
+            ),
+          ]);
+        }),
+      ],
+    );
+  }
+}
 
 class MinimizedYoutube extends StatelessWidget {
   final Function minimize;
@@ -169,37 +243,32 @@ class MinimizedYoutube extends StatelessWidget {
     return Container(
             width: double.infinity,
             color: Colors.amber[50],
-            height: 90.0,
-              child: Row(
-                children: [
-                  InkWell(
-                    onTap: () {if(context.read<PlayingModel>().song != null) minimize();},
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                      Text(title, overflow: TextOverflow.ellipsis,),
-                      Center(
-                        child: YoutubeValueBuilder(
-                          builder: (context, value) {
-                            return Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                IconButton(onPressed: value.playerState != PlayerState.unknown ? () {
-                                  PlayerState p = value.playerState;
-                                  if (p == PlayerState.ended || p == PlayerState.paused || p == PlayerState.unStarted) {
-                                    context.ytController.playVideo();
-                                  } else context.ytController.pauseVideo();
-                                } : null, icon: Icon(value.playerState == PlayerState.playing ? Icons.pause : Icons.play_arrow))
-                              ],
-                            );
-                          }
-                        ),
-                      ),
-                    ],
-                    ),
+            height: 40.0,
+              child: InkWell(
+                onTap: () {if(context.read<PlayingModel>().song != null) minimize();},
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    //youtube,
+                  Expanded(child: Text(title, overflow: TextOverflow.ellipsis,)),
+                  YoutubeValueBuilder(
+                    builder: (context, value) {
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(onPressed: value.playerState != PlayerState.unknown ? () {
+                            PlayerState p = value.playerState;
+                            if (p == PlayerState.ended || p == PlayerState.paused || p == PlayerState.unStarted) {
+                              context.ytController.playVideo();
+                            } else context.ytController.pauseVideo();
+                          } : null, icon: Icon(value.playerState == PlayerState.playing ? Icons.pause : Icons.play_arrow))
+                        ],
+                      );
+                    }
                   ),
                 ],
+                ),
               ),
             );
   }

@@ -24,6 +24,7 @@ class PlaylistViewModel extends ChangeNotifier{
   }
 
   Future<void> update() async {
+    loaded = false;
     SearchObject res = await searchRepository.getPlaylistVideoId(searchItem.id, token);
     if (res.success) {
       //print(res.searchItems);
@@ -35,6 +36,7 @@ class PlaylistViewModel extends ChangeNotifier{
   }
 
   Future<void> updateAll() async {
+    loaded = false;
     notifyListeners();
     do {
       
